@@ -14,6 +14,7 @@ import 'package:flutter_downloader/flutter_downloader.dart';
 
 String testUrl = "https://weverse.io/lesserafim/live/2-119098585";
 String testUrl2 = "https://weverse.io/fromis9/live/4-123117312";
+String testUrl3 = "https://weverse.io/fromis9/live/4-123919171";
 String loginUrl =
     "https://account.weverse.io/ko/signup?authType=redirect&client_id=weverse&redirect_uri=https%3A%2F%2Fweverse.io%2FloginResult%3Ftopath%3D%252F";
 String loginUrlLessrafim = "https://weverse.io/lesserafim/live";
@@ -95,7 +96,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   void doDownload(
-      {required String url,
+      {required List<dynamic> url,
       required String? savepath,
       int filesize = -1,
       String filename = ""}) async {
@@ -113,7 +114,7 @@ class _MyAppState extends State<MyApp> {
     // url =
     //     "https://static-cdn.jtvnw.net/jtv_user_pictures/db7e5db1-c9bc-4991-8529-57e04f38430b-profile_image-70x70.png";
     //write file
-    String filenameFromUrl = url.split("/").last.split("?").first;
+    String filenameFromUrl = url[0].split("/").last.split("?").first;
     String filenameAbs = "${savepath!}/$filenameFromUrl";
 
     if (kDebugMode) {
@@ -121,12 +122,12 @@ class _MyAppState extends State<MyApp> {
           "asdf : $storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize >> 20}MiB\n${"-" * 40}\n$savepath");
     }
     showMySnackbar(
-        "$storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize>> 20}MiB\n${"-" * 40}\n$filenameAbs");
+        "$storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize >> 20}MiB\n${"-" * 40}\n$filenameAbs");
 
     final alltasks = await FlutterDownloader.loadTasks();
     int restart = -1;
     String restartTaskId = "";
-    // bool alreadyexsist = false;
+    bool alreadyexsist = false;
     for (var item in alltasks!) {
       if (kDebugMode) {
         print("asdf filename : ${item.filename}");
@@ -225,19 +226,19 @@ class _MyAppState extends State<MyApp> {
           await file.delete();
         }
         // final taskId =
-        await FlutterDownloader.enqueue(
-          url: url,
-          headers: {}, // optional: header send with url (auth token etc)
-          savedDir: "$savepath/",
-          fileName:
-              "${filename}_$filenameFromUrl", //url.split("/").last.split("?").first,
-          // show download progress in status bar (for Android)
-          showNotification: true,
-          // click on notification to open downloaded file (for Android)
-          openFileFromNotification: true,
-          allowCellular: true,
-          // saveInPublicStorage: true,
-        );
+        // await FlutterDownloader.enqueue(
+        //   url: url,
+        //   headers: {}, // optional: header send with url (auth token etc)
+        //   savedDir: "$savepath/",
+        //   fileName:
+        //       "${filename}_$filenameFromUrl", //url.split("/").last.split("?").first,
+        //   // show download progress in status bar (for Android)
+        //   showNotification: true,
+        //   // click on notification to open downloaded file (for Android)
+        //   openFileFromNotification: true,
+        //   allowCellular: true,
+        //   // saveInPublicStorage: true,
+        // );
       }
     }
   }
@@ -288,72 +289,97 @@ class _MyAppState extends State<MyApp> {
       if (reqs["dataurl"]!.isNotEmpty) {
         http.Response response = await http.get(Uri.parse(reqs["dataurl"]!));
         if (response.statusCode == 200) {
-          List videolist = jsonDecode(response.body)["videos"]["list"];
-          if (videolist.toString() != "null") {
-            String downloadUrl = "";
-            int downloadSize = -1;
-            videolist.sort((i, j) => j["size"].compareTo(i["size"]));
-            downloadUrl = videolist[0]["source"];
-            downloadSize = videolist[0]["size"];
-            if (notificationPermission != PermissionStatus.granted) {
-              requestNotificationsPermission();
+          List<dynamic> listResolution = RegExp(r"[^=]*m3u8(?!\.m3u8)")
+              .allMatches(String.fromCharCodes(response.bodyBytes))
+              .toList();
+          listResolution.sort((i, j) =>
+              int.parse(j[0]!.toString().split("\n").first.split("x").first)
+                  .compareTo(int.parse(
+                      i[0]!.toString().split("\n").first.split("x").first)));
+          String maxm3u8url = reqs["dataurl"]!.replaceFirst(
+              RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"),
+              listResolution[0][0]!.split("\n")[1]);
+          print("asdf max resol m3u8 : " + maxm3u8url);
+          response = await http.get(Uri.parse(maxm3u8url));
+          if (response.statusCode == 200) {
+            List<dynamic> listtsFile = RegExp(r".*\.ts.*")
+                .allMatches(String.fromCharCodes(response.bodyBytes))
+                .toList();
+            List<String> listtsurl = [];
+            for (var item in listtsFile) {
+              // print("asdf ts files: " + item[0]);
+              print("asdf ts url : " +
+                  reqs["dataurl"]!.replaceFirst(
+                      RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"), item[0]));
+              listtsurl.add(reqs["dataurl"]!.replaceFirst(
+                  RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"), item[0]));
             }
-            if (storagePermission != PermissionStatus.granted) {
-              await requestStoragePermission();
-              print("asdf permi 2 ${storagePermission.toString()}");
-            }
-            if (storagePermission == PermissionStatus.granted &&
-                notificationPermission == PermissionStatus.granted) {
-              //pick dir
-              String selectedDirectory = "";
-              if (grantedSavePath.isEmpty) {
-                if (mounted) {
-                  await showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          // title: Text('제목'),
-                          content: const SingleChildScrollView(
-                            child: ListBody(
-                              //List Body를 기준으로 Text 설정
-                              children: <Widget>[
-                                Text("Select directory."),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              child: const Text('OK'),
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                            ),
-                            // TextButton(
-                            //   child: const Text('취소'),
-                            //   onPressed: () {
-                            //     Navigator.of(context).pop();
-                            //   },
-                            // ),
-                          ],
-                        );
-                      });
 
-                  selectedDirectory = await getSaveDirPath();
+            if (listtsurl.isNotEmpty) {
+              var downloadUrl = listtsurl;
+              // int downloadSize = -1;
+              // downloadUrl = videolist[0]["source"];
+              // downloadSize = videolist[0]["size"];
+              if (notificationPermission != PermissionStatus.granted) {
+                requestNotificationsPermission();
+              }
+              if (storagePermission != PermissionStatus.granted) {
+                await requestStoragePermission();
+                print("asdf permi 2 ${storagePermission.toString()}");
+              }
+              if (storagePermission == PermissionStatus.granted &&
+                  notificationPermission == PermissionStatus.granted) {
+                //pick dir
+                String selectedDirectory = "";
+                if (grantedSavePath.isEmpty) {
+                  if (mounted) {
+                    await showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            // title: Text('제목'),
+                            content: const SingleChildScrollView(
+                              child: ListBody(
+                                //List Body를 기준으로 Text 설정
+                                children: <Widget>[
+                                  Text("Select directory."),
+                                ],
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                child: const Text('OK'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              // TextButton(
+                              //   child: const Text('취소'),
+                              //   onPressed: () {
+                              //     Navigator.of(context).pop();
+                              //   },
+                              // ),
+                            ],
+                          );
+                        });
+
+                    selectedDirectory = await getSaveDirPath();
+                  }
+                } else {
+                  selectedDirectory =
+                      grantedSavePath[grantedSavePath.length - 1];
+                }
+                if (selectedDirectory != "Access denied") {
+                  doDownload(
+                      url: downloadUrl,
+                      savepath: selectedDirectory,
+                      // filesize: downloadSize,
+                      filename:
+                          downloadUrl[0].split("/").last.split("?").first);
                 }
               } else {
-                selectedDirectory = grantedSavePath[grantedSavePath.length - 1];
+                showMySnackbar("permission denied. Try again.");
               }
-              if (selectedDirectory != "Access denied") {
-                doDownload(
-                    url: downloadUrl,
-                    savepath: selectedDirectory,
-                    filesize: downloadSize,
-                    filename: downloadUrl
-                        .split("/")
-                        .elementAt(downloadUrl.split("/").length - 2));
-              }
-            } else {
-              showMySnackbar("permission denied. Try again.");
             }
           }
         }
@@ -454,7 +480,7 @@ class _MyAppState extends State<MyApp> {
               Align(
                 child: InAppWebView(
                   initialUrlRequest: URLRequest(
-                    url: WebUri(loginUrlLessrafim),
+                    url: WebUri(testUrl3),
                   ),
                   initialSettings: InAppWebViewSettings(
                       userAgent:
@@ -463,13 +489,17 @@ class _MyAppState extends State<MyApp> {
                     String nowurl =
                         (await webViewController!.getUrl()).toString();
                     if (reqs["originurl"] != nowurl &&
-                        request.url.toString().contains("rmcnmv") &&
-                        request.url.toString().contains("key")) {
+                        // request.url.toString().contains("rmcnmv") &&
+                        // request.url.toString().contains("key")) {
+                        reqs["dataurl"] == null &&
+                        request.url.toString().contains(".m3u8")) {
                       reqs["dataurl"] = request.url.toString();
+                      // print("asdf : dataurl" + reqs["dataurl"]);
                       reqs["originurl"] =
                           (await webViewController!.getUrl()).toString();
                     }
                     return null;
+                    // return null;
                   },
                   onProgressChanged: (controller, progress) async {
                     webviewProgrss = progress;
