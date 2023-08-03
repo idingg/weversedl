@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
@@ -10,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_downloader/flutter_downloader.dart';
+// import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:background_downloader/background_downloader.dart';
 
 String testUrl = "https://weverse.io/lesserafim/live/2-119098585";
 String testUrl2 = "https://weverse.io/fromis9/live/4-123117312";
@@ -32,11 +32,11 @@ Future main() async {
   }
 
   WidgetsFlutterBinding.ensureInitialized();
-  await FlutterDownloader.initialize(
-      // optional: set to false to disable printing logs to console (default: true)
-      debug: true,
-      // option: set to false to disable working with http links (default: false)
-      ignoreSsl: true);
+  // await FlutterDownloader.initialize(
+  //     // optional: set to false to disable printing logs to console (default: true)
+  //     debug: true,
+  //     // option: set to false to disable working with http links (default: false)
+  //     ignoreSsl: true);
 
   runApp(const MaterialApp(
       themeMode: ThemeMode.dark,
@@ -44,20 +44,20 @@ Future main() async {
       home: MyApp()));
 }
 
-@pragma('vm:entry-point')
-void downloadCallback(String id, int status, int progress) async {
-  final SendPort? send =
-      IsolateNameServer.lookupPortByName("downloader_send_port");
-  send!.send([id, status, progress]);
-  print("asdf callback: $id, $status, $progress");
-  if (status == DownloadTaskStatus.complete.index) {
-    print("asdf callback $id : Downloaded");
-    await FlutterDownloader.remove(taskId: id);
-  } else {
-    // print("$id, $status, $progress");
-  }
-  // ResourcesPathHandler
-}
+// @pragma('vm:entry-point')
+// void downloadCallback(String id, int status, int progress) async {
+//   final SendPort? send =
+//       IsolateNameServer.lookupPortByName("downloader_send_port");
+//   send!.send([id, status, progress]);
+//   print("asdf callback: $id, $status, $progress");
+//   if (status == DownloadTaskStatus.complete.index) {
+//     print("asdf callback $id : Downloaded");
+//     await FlutterDownloader.remove(taskId: id);
+//   } else {
+//     // print("$id, $status, $progress");
+//   }
+//   // ResourcesPathHandler
+// }
 
 class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -81,22 +81,22 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    IsolateNameServer.registerPortWithName(
-        _port.sendPort, 'downloader_send_port');
-    _port.listen((dynamic data) {
-      String id = data[0];
-      DownloadTaskStatus status = data[1];
-      int progress = data[2];
-      setState(() {});
-    });
+    // IsolateNameServer.registerPortWithName(
+    //     _port.sendPort, 'downloader_send_port');
+    // _port.listen((dynamic data) {
+    //   String id = data[0];
+    //   DownloadTaskStatus status = data[1];
+    //   int progress = data[2];
+    //   setState(() {});
+    // });
 
-    FlutterDownloader.registerCallback(downloadCallback);
+    // FlutterDownloader.registerCallback(downloadCallback);
 
     super.initState();
   }
 
   void doDownload(
-      {required List<dynamic> url,
+      {required List<dynamic> tsurls,
       required String? savepath,
       int filesize = -1,
       String filename = ""}) async {
@@ -114,66 +114,87 @@ class _MyAppState extends State<MyApp> {
     // url =
     //     "https://static-cdn.jtvnw.net/jtv_user_pictures/db7e5db1-c9bc-4991-8529-57e04f38430b-profile_image-70x70.png";
     //write file
-    String filenameFromUrl = url[0].split("/").last.split("?").first;
+    String filenameFromUrl = tsurls[0].split("/").last.split("?").first;
     String filenameAbs = "${savepath!}/$filenameFromUrl";
 
-    if (kDebugMode) {
-      print(
-          "asdf : $storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize >> 20}MiB\n${"-" * 40}\n$savepath");
-    }
-    showMySnackbar(
-        "$storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize >> 20}MiB\n${"-" * 40}\n$filenameAbs");
+    // if (kDebugMode) {
+    //   print(
+    //       "asdf : $storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize >> 20}MiB\n${"-" * 40}\n$savepath");
+    // }
+    // showMySnackbar(
+    //     "$storagePermission\n${DateTime.now()}\n$url\n${"-" * 40}\n$filesize, ${filesize >> 20}MiB\n${"-" * 40}\n$filenameAbs");
+    print("asdf do download: ${tsurls[0] + ", " + tsurls[1]}");
+    List<dynamic>? listTasks = List.empty(growable: true);
+    // print("asdf");
+    // for (var item in tsurls) {
+    //   listTasks.add(DownloadTask(
+    //     url: item,
+    //     filename: item.split("/").last.split("?").first,
+    //     directory: savepath,
+    //     updates:
+    //         Updates.statusAndProgress, // request status and progress updates
+    //     requiresWiFi: false,
+    //     retries: 5,
+    //     allowPause: true,
+    //     // metaData: 'data for me',
+    //   ));
+    // }
+    // listTasks;
+    //
 
-    final alltasks = await FlutterDownloader.loadTasks();
+    // final alltasks = await FlutterDownloader.loadTasks();
     int restart = -1;
     String restartTaskId = "";
     bool alreadyexsist = false;
-    for (var item in alltasks!) {
-      if (kDebugMode) {
-        print("asdf filename : ${item.filename}");
-      }
-      if (item.status == DownloadTaskStatus.complete ||
-          item.status == DownloadTaskStatus.failed) {
-        print("asdf remove : $item.taskId");
-        FlutterDownloader.remove(taskId: item.taskId);
-      } else if (item.status == DownloadTaskStatus.running &&
-          item.filename == filenameFromUrl) {
-        if (mounted) {
-          await showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  // title: Text('제목'),
-                  content: const SingleChildScrollView(
-                    child: ListBody(
-                      //List Body를 기준으로 Text 설정
-                      children: <Widget>[
-                        Text("Already downloading.\nRestart?"),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      child: const Text('Yes'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        restart = 1;
-                      },
-                    ),
-                    TextButton(
-                      child: const Text('No'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        restart = 0;
-                      },
-                    ),
-                  ],
-                );
-              });
-        }
+    // for (var item in alltasks!)
+    {
+      // if (kDebugMode) {
+      //   print("asdf filename : ${item.filename}");
+      // }
+      // if (item.status == DownloadTaskStatus.complete ||
+      //     item.status == DownloadTaskStatus.failed) {
+      //   print("asdf remove : $item.taskId");
+      //   FlutterDownloader.remove(taskId: item.taskId);
+      // } else if (item.status == DownloadTaskStatus.running &&
+      //     item.filename == filenameFromUrl)
 
-        break;
-      }
+      // {
+      //   if (mounted) {
+      //     await showDialog(
+      //         context: context,
+      //         builder: (BuildContext context) {
+      //           return AlertDialog(
+      //             // title: Text('제목'),
+      //             content: const SingleChildScrollView(
+      //               child: ListBody(
+      //                 //List Body를 기준으로 Text 설정
+      //                 children: <Widget>[
+      //                   Text("Already downloading.\nRestart?"),
+      //                 ],
+      //               ),
+      //             ),
+      //             actions: [
+      //               TextButton(
+      //                 child: const Text('Yes'),
+      //                 onPressed: () {
+      //                   Navigator.of(context).pop();
+      //                   restart = 1;
+      //                 },
+      //               ),
+      //               TextButton(
+      //                 child: const Text('No'),
+      //                 onPressed: () {
+      //                   Navigator.of(context).pop();
+      //                   restart = 0;
+      //                 },
+      //               ),
+      //             ],
+      //           );
+      //         });
+      //   }
+
+      //   // break;
+      // }
     }
     // ignore: curly_braces_in_flow_control_structures
     if (restart == 1 || restart == -1) {
@@ -182,7 +203,7 @@ class _MyAppState extends State<MyApp> {
         if (kDebugMode) {
           print("asdf restart : $restart");
         }
-        FlutterDownloader.remove(taskId: restartTaskId);
+        // FlutterDownloader.remove(taskId: restartTaskId);
       }
       restart = -1;
       File file = File(filenameAbs);
@@ -299,7 +320,7 @@ class _MyAppState extends State<MyApp> {
           String maxm3u8url = reqs["dataurl"]!.replaceFirst(
               RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"),
               listResolution[0][0]!.split("\n")[1]);
-          print("asdf max resol m3u8 : " + maxm3u8url);
+          print("asdf max resol m3u8 : $maxm3u8url");
           response = await http.get(Uri.parse(maxm3u8url));
           if (response.statusCode == 200) {
             List<dynamic> listtsFile = RegExp(r".*\.ts.*")
@@ -308,9 +329,8 @@ class _MyAppState extends State<MyApp> {
             List<String> listtsurl = [];
             for (var item in listtsFile) {
               // print("asdf ts files: " + item[0]);
-              print("asdf ts url : " +
-                  reqs["dataurl"]!.replaceFirst(
-                      RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"), item[0]));
+              // print(
+              //     "asdf ts url : ${reqs["dataurl"]!.replaceFirst(RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"), item[0])}");
               listtsurl.add(reqs["dataurl"]!.replaceFirst(
                   RegExp(r"[^/]*m3u8(?!.*\/[^/]*m3u8)"), item[0]));
             }
@@ -371,7 +391,7 @@ class _MyAppState extends State<MyApp> {
                 }
                 if (selectedDirectory != "Access denied") {
                   doDownload(
-                      url: downloadUrl,
+                      tsurls: downloadUrl,
                       savepath: selectedDirectory,
                       // filesize: downloadSize,
                       filename:
